@@ -195,6 +195,10 @@ export interface DashboardFilters {
 
 export type ConsumptionDistributionChartType = 'bar' | 'area'
 
+// Consumption distribution metric: quota follows the legacy money view, tokens
+// plots the recorded token usage instead.
+export type ConsumptionMetric = 'quota' | 'tokens'
+
 export type ModelAnalyticsChartTab = 'trend' | 'proportion' | 'top'
 
 export interface DashboardChartPreferences {

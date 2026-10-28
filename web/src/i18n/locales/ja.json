@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "トークン内訳",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "トークン数が上限を超えています。完全一致検索のみ可能なため、% ワイルドカードは使用しないでください",
+    "Token Distribution": "トークン消費分布",
     "Token Endpoint": "トークンエンドポイント",
     "Token Endpoint (Optional)": "トークンエンドポイント (オプション)",
     "Token estimator": "トークン見積り",

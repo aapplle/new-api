@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "Chi tiết token",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "Số lượng token vượt quá giới hạn. Chỉ cho phép tìm kiếm chính xác, không dùng ký tự đại diện %",
+    "Token Distribution": "Phân bổ token",
     "Token Endpoint": "Điểm cuối Token",
     "Token Endpoint (Optional)": "Điểm cuối Token (Tùy chọn)",
     "Token estimator": "Ước tính token",

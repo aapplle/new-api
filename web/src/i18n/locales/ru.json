@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "Детализация токенов",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "Количество токенов превышает лимит. Разрешён только точный поиск, не используйте подстановочный знак %",
+    "Token Distribution": "Распределение токенов",
     "Token Endpoint": "Конечная точка токена",
     "Token Endpoint (Optional)": "Конечная точка токена (необязательно)",
     "Token estimator": "Оценка токенов",

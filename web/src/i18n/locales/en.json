@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "Token Breakdown",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard",
+    "Token Distribution": "Token Distribution",
     "Token Endpoint": "Token Endpoint",
     "Token Endpoint (Optional)": "Token Endpoint (Optional)",
     "Token estimator": "Token estimator",

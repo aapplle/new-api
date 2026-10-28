@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "Token 明细",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "令牌数量超过上限，仅允许精确搜索，请勿使用 % 通配符",
+    "Token Distribution": "Token 消耗分布",
     "Token Endpoint": "令牌端点",
     "Token Endpoint (Optional)": "Token 端点（可选）",
     "Token estimator": "Token 估算器",

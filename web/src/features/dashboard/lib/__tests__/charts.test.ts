@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, test } from 'vitest'
 
 import type { QuotaDataItem } from '@/features/dashboard/types'
+import { getCurrencyDisplay } from '@/lib/currency'
 import type { TimeGranularity } from '@/lib/time'
 
 import { processChartData, processUserChartData } from '../charts'
@@ -152,5 +153,91 @@ describe.each(cases)('dashboard $granularity chart chronology', (scenario) => {
         )
       ).toEqual([0, 0, 0, 0, 0, 0, 8])
     }
+  })
+})
+
+describe('dashboard consumption metric', () => {
+  const firstDay = Math.floor(new Date('2026-01-05T00:00:00').getTime() / 1000)
+  const secondDay = firstDay + 86400
+
+  // Cache columns are present on purpose: the token view reports recorded
+  // prompt+completion usage, so cache reads must not be folded in again.
+  const data: QuotaDataItem[] = [
+    {
+      created_at: firstDay,
+      model_name: 'model-a',
+      username: 'alice',
+      quota: 500000,
+      count: 2,
+      token_used: 1200,
+      cache_read_tokens: 300,
+      cache_creation_tokens: 100,
+    },
+    {
+      created_at: firstDay,
+      model_name: 'model-b',
+      username: 'alice',
+      quota: 250000,
+      count: 1,
+      token_used: 800,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
+    },
+    {
+      created_at: secondDay,
+      model_name: 'model-a',
+      username: 'alice',
+      quota: 100000,
+      count: 1,
+      token_used: 500,
+      cache_read_tokens: 50,
+      cache_creation_tokens: 0,
+    },
+  ]
+
+  type Point = { Time: string; Model: string; Usage: number; TimeSum: number }
+
+  function areaPoints(metric?: 'quota' | 'tokens'): Point[] {
+    const result = processChartData(data, 'day', undefined, undefined, metric)
+    return result.spec_area.data[0].values as Point[]
+  }
+
+  function dayLabelBeforeLast(points: Point[]): string | undefined {
+    const labels = [...new Set(points.map((point) => point.Time))]
+    return labels.at(-2)
+  }
+
+  test('plots recorded token usage per model when the metric is tokens', () => {
+    const points = areaPoints('tokens')
+    const firstDayLabel = dayLabelBeforeLast(points)
+    const dayPoints = points.filter((point) => point.Time === firstDayLabel)
+
+    expect(
+      dayPoints
+        .map((point) => [point.Model, point.Usage])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    ).toEqual([
+      ['model-a', 1200],
+      ['model-b', 800],
+    ])
+    expect(dayPoints[0].TimeSum).toBe(2000)
+  })
+
+  test('keeps cache tokens out of the token total', () => {
+    const result = processChartData(data, 'day', undefined, undefined, 'tokens')
+
+    // 1200 + 800 + 500 recorded tokens; the 450 cached tokens are not added.
+    expect(result.totalQuotaDisplay).toMatch(/2\.5\s*K/i)
+  })
+
+  test('keeps plotting quota money when no metric is given', () => {
+    const { config } = getCurrencyDisplay()
+    const points = areaPoints()
+    const firstDayLabel = dayLabelBeforeLast(points)
+    const modelA = points.find(
+      (point) => point.Time === firstDayLabel && point.Model === 'model-a'
+    )
+
+    expect(modelA?.Usage).toBeCloseTo(500000 / config.quotaPerUnit, 4)
   })
 })

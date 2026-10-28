@@ -6504,6 +6504,7 @@
     "token (unit)": "token",
     "Token Breakdown": "Détails des tokens",
     "Token count exceeds the limit. Only exact search is allowed, do not use the % wildcard": "Le nombre de jetons dépasse la limite. Seule la recherche exacte est autorisée, n'utilisez pas le joker %",
+    "Token Distribution": "Répartition des tokens",
     "Token Endpoint": "Point de terminaison de jeton",
     "Token Endpoint (Optional)": "Point de terminaison du jeton (Facultatif)",
     "Token estimator": "Estimation des jetons",
