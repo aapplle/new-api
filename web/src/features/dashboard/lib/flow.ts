@@ -114,7 +114,7 @@ const FLOW_NODE_KINDS: readonly FlowNodeKind[] = [
 ]
 const FLOW_NODE_KIND_SET = new Set<FlowNodeKind>(FLOW_NODE_KINDS)
 
-const OTHER_FLOW_NODE_IDS: Record<FlowNodeKind, string> = {
+export const OTHER_FLOW_NODE_IDS: Record<FlowNodeKind, string> = {
   user: 'user:__other__',
   node: 'node:__other__',
   token: 'token:__other__',
