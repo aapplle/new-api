@@ -74,7 +74,8 @@ export function processChartData(
   timeGranularity: TimeGranularity = 'day',
   t?: TFunction,
   chartCornerRadius?: number,
-  metric: ConsumptionMetric = 'quota'
+  metric: ConsumptionMetric = 'quota',
+  locale?: Intl.LocalesArgument
 ): ProcessedChartData {
   const tt: TFunction = t ?? ((x) => x)
   const otherLabel = tt('Other')
@@ -82,12 +83,16 @@ export function processChartData(
 
   const formatInt = (value: number) =>
     Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
+  // Token figures follow the interface language so the chart and the flow cards
+  // agree on 5.3B vs 5.3亿; quota keeps its existing environment-locale output.
+  const formatTokenInt = (value: number) =>
+    Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value)
   const formatQuotaValue = (value: number) => renderQuotaCompat(value, 4)
   const formatQuotaTotal = (value: number) => renderQuotaCompat(value, 2)
   const formatMetricValue = (value: number) =>
-    usesTokens ? formatInt(value) : formatQuotaValue(value)
+    usesTokens ? formatTokenInt(value) : formatQuotaValue(value)
   const formatMetricTotal = (value: number) =>
-    usesTokens ? formatCompactNumber(value) : formatQuotaTotal(value)
+    usesTokens ? formatCompactNumber(value, locale) : formatQuotaTotal(value)
 
   const MAX_TOOLTIP_MODELS = 15
   const isOtherTooltipKey = (key: string) =>
@@ -124,7 +129,7 @@ export function processChartData(
           ...otherItems,
         ].reduce((sum, item) => {
           const raw = item.datum
-            ? Number((item.datum as Record<string, unknown>)?.rawQuota) || 0
+            ? Number((item.datum as Record<string, unknown>)?.rawMetric) || 0
             : 0
           return sum + raw
         }, 0)
@@ -215,7 +220,7 @@ export function processChartData(
           text: tt('Call Count Ranking'),
         },
       },
-      totalQuotaDisplay: formatMetricTotal(0),
+      totalMetricDisplay: formatMetricTotal(0),
       totalCountDisplay: formatInt(0),
     }
   }
@@ -340,7 +345,7 @@ export function processChartData(
       orient: 'left',
       type: 'linear',
       label: {
-        formatMethod: (value: number) => formatCompactNumber(value),
+        formatMethod: (value: number) => formatCompactNumber(value, locale),
       },
     },
   ]
@@ -730,7 +735,7 @@ export function processChartData(
       background: { fill: 'transparent' },
       animation: true,
     },
-    totalQuotaDisplay: formatMetricTotal(
+    totalMetricDisplay: formatMetricTotal(
       usesTokens ? totalTokensRaw : totalQuotaRaw
     ),
     totalCountDisplay: formatInt(totalTimes),

@@ -72,6 +72,26 @@ describe('flow key stats', () => {
     expect(screen.getByText('3.7M')).toBeInTheDocument()
   })
 
+  test('keeps the merged overflow bucket after the real keys', () => {
+    render(
+      <FlowKeyStats
+        nodes={[
+          node('token:__other__', 'Other tokens', 'token', 9999, 10),
+          node('token:1', 'qq-bot', 'token', 100, 1),
+          node('token:2', 'open-webui', 'token', 200, 2),
+        ]}
+        timeRangeMinutes={60}
+      />
+    )
+
+    const cards = screen.getAllByRole('group')
+    expect(cards.map((card) => card.getAttribute('aria-label'))).toEqual([
+      'open-webui',
+      'qq-bot',
+      'Other tokens',
+    ])
+  })
+
   test('renders nothing when the token stage has no nodes', () => {
     const { container } = render(
       <FlowKeyStats

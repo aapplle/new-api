@@ -34,6 +34,7 @@ import type {
   ConsumptionMetric,
   QuotaDataItem,
 } from '@/features/dashboard/types'
+import { toIntlLocale } from '@/i18n/languages'
 import { useThemeRadiusPx } from '@/lib/theme-radius'
 import type { TimeGranularity } from '@/lib/time'
 import { VCHART_OPTION } from '@/lib/vchart'
@@ -68,20 +69,10 @@ const METRIC_OPTIONS: Array<{
   { value: 'tokens', labelKey: 'Tokens', icon: Layers },
 ]
 
-function readStoredMetric(): ConsumptionMetric {
-  try {
-    return window.localStorage.getItem(METRIC_STORAGE_KEY) === 'quota'
-      ? 'quota'
-      : 'tokens'
-  } catch {
-    return 'tokens'
-  }
-}
-
 export function ConsumptionDistributionChart(
   props: ConsumptionDistributionChartProps
 ) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { resolvedTheme } = useTheme()
   const { customization } = useThemeCustomization()
   const chartRadius = useThemeRadiusPx(
@@ -93,12 +84,21 @@ export function ConsumptionDistributionChart(
   )
   // Token usage answers "how much did each model consume" far more directly
   // than the money view, so it is the default and the last choice is kept.
-  const [metric, setMetric] = useState<ConsumptionMetric>(readStoredMetric)
+  const [metric, setMetric] = useState<ConsumptionMetric>(() => {
+    try {
+      return window.localStorage.getItem(METRIC_STORAGE_KEY) === 'quota'
+        ? 'quota'
+        : 'tokens'
+    } catch {
+      return 'tokens'
+    }
+  })
   const [themeReady, setThemeReady] = useState(false)
   const themeManagerRef = useRef<
     (typeof import('@visactor/vchart'))['ThemeManager'] | null
   >(null)
   const timeGranularity = props.timeGranularity ?? DEFAULT_TIME_GRANULARITY
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
 
   useEffect(() => {
     if (props.defaultChartType) setChartType(props.defaultChartType)
@@ -138,9 +138,10 @@ export function ConsumptionDistributionChart(
         timeGranularity,
         t,
         chartRadius,
-        metric
+        metric,
+        locale
       ),
-    [props.data, props.loading, timeGranularity, t, chartRadius, metric]
+    [props.data, props.loading, timeGranularity, t, chartRadius, metric, locale]
   )
   const spec = chartType === 'bar' ? chartData.spec_line : chartData.spec_area
   const specType = typeof spec?.type === 'string' ? spec.type : chartType
@@ -167,7 +168,7 @@ export function ConsumptionDistributionChart(
               : t('Quota Distribution')}
           </div>
           <span className='text-muted-foreground text-xs'>
-            {t('Total:')} {chartData.totalQuotaDisplay}
+            {t('Total:')} {chartData.totalMetricDisplay}
           </span>
         </div>
 
