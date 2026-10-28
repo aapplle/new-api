@@ -1,0 +1,146 @@
+name: Local build
+
+# GitHub only runs schedule triggers from the default branch, so this workflow
+# lives on main together with the patch. Every six hours it rebases main onto
+# upstream, and rebuilds when either the code or the upstream version moved.
+# Builds are tagged with the upstream release version (for example
+# v1.0.0-rc.51). A failed run notifies the pusher by email.
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: local-build
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Rebase onto upstream and report whether anything moved
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream https://github.com/QuantumNous/new-api.git
+          git fetch --tags --force upstream
+
+          BEFORE=$(git rev-parse HEAD)
+          # A conflict fails the run and emails the owner; nothing is pushed
+          # after a failed rebase, so the branch stays deployable.
+          git rebase upstream/main
+          git push --force-with-lease origin main
+
+          AFTER=$(git rev-parse HEAD)
+          VERSION=$(git describe --tags --match 'v[0-9]*' --abbrev=0)
+          LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+
+          if [ "$BEFORE" != "$AFTER" ] || [ "$VERSION" != "$LATEST" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "head=$AFTER version=$VERSION previous_release=$LATEST"
+
+  build:
+    needs: [sync]
+    if: always() && (github.event_name == 'push' || (needs.sync.result == 'success' && needs.sync.outputs.changed == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # git describe needs the history back to the last upstream tag.
+          fetch-depth: 0
+
+      - name: Resolve upstream version
+        id: version
+        run: |
+          git fetch --tags --force https://github.com/QuantumNous/new-api.git 'refs/tags/*:refs/tags/*'
+          VERSION=$(git describe --tags --match 'v[0-9]*' --abbrev=0 || true)
+          if [ -z "$VERSION" ]; then
+            echo "::error::No upstream tag reachable from HEAD"
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building $VERSION at $(git rev-parse --short HEAD)"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: true
+
+      - name: Build web
+        working-directory: web
+        env:
+          DISABLE_ESLINT_PLUGIN: 'true'
+          VITE_REACT_APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+          GOWORK: 'off'
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$VERSION'" \
+            -o new-api .
+
+      - name: Verify the build carries the patch and the version
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          grep -qa dashboard_consumption_metric new-api
+          grep -qaF "$VERSION" new-api
+          echo "patched frontend and version $VERSION are embedded"
+
+      - name: Package
+        run: |
+          sha256sum new-api > new-api.sha256
+          cat new-api.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          NOTES="Patched build on top of $VERSION (commit $(git rev-parse --short HEAD))."
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" new-api new-api.sha256 --clobber
+            gh release edit "$VERSION" --notes "$NOTES"
+          else
+            gh release create "$VERSION" new-api new-api.sha256 \
+              --target "$GITHUB_SHA" --title "$VERSION" --notes "$NOTES"
+          fi
+          echo "https://github.com/$GITHUB_REPOSITORY/releases/download/$VERSION/new-api"
