@@ -20,7 +20,8 @@ import { describe, expect, test } from 'vitest'
 
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { getCurrencyDisplay } from '@/lib/currency'
-import type { TimeGranularity } from '@/lib/time'
+import { formatCompactNumber } from '@/lib/format'
+import { formatChartTime, type TimeGranularity } from '@/lib/time'
 
 import { processChartData, processUserChartData } from '../charts'
 
@@ -202,14 +203,10 @@ describe('dashboard consumption metric', () => {
     return result.spec_area.data[0].values as Point[]
   }
 
-  function dayLabelBeforeLast(points: Point[]): string | undefined {
-    const labels = [...new Set(points.map((point) => point.Time))]
-    return labels.at(-2)
-  }
+  const firstDayLabel = formatChartTime(firstDay, 'day')
 
   test('plots recorded token usage per model when the metric is tokens', () => {
     const points = areaPoints('tokens')
-    const firstDayLabel = dayLabelBeforeLast(points)
     const dayPoints = points.filter((point) => point.Time === firstDayLabel)
 
     expect(
@@ -227,13 +224,54 @@ describe('dashboard consumption metric', () => {
     const result = processChartData(data, 'day', undefined, undefined, 'tokens')
 
     // 1200 + 800 + 500 recorded tokens; the 450 cached tokens are not added.
-    expect(result.totalQuotaDisplay).toMatch(/2\.5\s*K/i)
+    expect(result.totalMetricDisplay).toBe(formatCompactNumber(2500))
+  })
+
+  test('sums the collapsed tooltip overflow in token units', () => {
+    const rows: QuotaDataItem[] = Array.from({ length: 16 }, (_, index) => ({
+      created_at: firstDay,
+      model_name: `model-${String(index).padStart(2, '0')}`,
+      // Quota deliberately differs from tokens so a money sum cannot pass.
+      quota: 7000 * (index + 1),
+      count: 1,
+      token_used: 1000 * (index + 1),
+    }))
+    const total = rows.reduce((sum, row) => sum + (row.token_used ?? 0), 0)
+    const result = processChartData(rows, 'day', undefined, undefined, 'tokens')
+    const updateContent = result.spec_line.tooltip.dimension.updateContent as (
+      items: Array<{
+        key: string
+        value: number
+        datum: { rawMetric: number; rawQuota: number; TimeSum: number }
+      }>
+    ) => Array<{ key: string; value: string | number }>
+
+    const output = updateContent(
+      rows.map((row) => ({
+        key: String(row.model_name),
+        value: Number(row.token_used),
+        datum: {
+          rawMetric: Number(row.token_used),
+          rawQuota: Number(row.quota),
+          TimeSum: total,
+        },
+      }))
+    )
+    const digits = (value: string | number | undefined) =>
+      Number(String(value).replaceAll(/\D/g, ''))
+
+    // model-00 falls outside the top 15 and must be merged using token counts.
+    expect(digits(output.find((item) => item.key === 'Other')?.value)).toBe(
+      1000
+    )
+    expect(digits(output.find((item) => item.key === 'Total:')?.value)).toBe(
+      total
+    )
   })
 
   test('keeps plotting quota money when no metric is given', () => {
     const { config } = getCurrencyDisplay()
     const points = areaPoints()
-    const firstDayLabel = dayLabelBeforeLast(points)
     const modelA = points.find(
       (point) => point.Time === firstDayLabel && point.Model === 'model-a'
     )
