@@ -20,6 +20,7 @@ import { KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { IconBadge } from '@/components/ui/icon-badge'
+import { OTHER_FLOW_NODE_IDS } from '@/features/dashboard/lib/flow'
 import type { DashboardFlowNode } from '@/features/dashboard/types'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
@@ -29,15 +30,23 @@ interface FlowKeyStatsProps {
   timeRangeMinutes: number
 }
 
-// Per-API-key summary above the flow chart. It reads the token nodes the flow
-// graph already built, so the numbers always match the rendered ribbons.
+// Per-key summary above the flow chart. It reads the token nodes the flow graph
+// already built, so every card matches the ribbon it sits above and no extra
+// request is needed. The graph applies the top-N limit, so with many keys the
+// cards show the same subset (plus the merged "other" bucket, kept last).
 export function FlowKeyStats(props: FlowKeyStatsProps) {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const minutes = Math.max(props.timeRangeMinutes, 1)
+  // A sub-minute range is legitimate when the user picks a tight window.
+  const minutes = Math.max(props.timeRangeMinutes, 1 / 60)
   const keys = props.nodes
     .filter((node) => node.kind === 'token')
-    .sort((a, b) => b.tokens - a.tokens)
+    .sort((a, b) => {
+      const aOther = a.id === OTHER_FLOW_NODE_IDS.token
+      const bOther = b.id === OTHER_FLOW_NODE_IDS.token
+      if (aOther !== bOther) return aOther ? 1 : -1
+      return b.tokens - a.tokens
+    })
 
   if (keys.length === 0) return null
 
@@ -50,7 +59,7 @@ export function FlowKeyStats(props: FlowKeyStatsProps) {
             key={key.id}
             role='group'
             aria-label={key.label}
-            className='min-w-0 flex-1 basis-64 rounded-lg border px-4 py-3'
+            className='min-w-56 flex-1 basis-64 rounded-lg border px-4 py-3'
           >
             <div className='flex min-w-0 items-center gap-2'>
               <IconBadge tone='chart-4' size='stat'>
