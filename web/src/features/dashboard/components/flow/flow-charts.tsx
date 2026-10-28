@@ -94,6 +94,7 @@ import { cn } from '@/lib/utils'
 import { VCHART_OPTION } from '@/lib/vchart'
 import { useAuthStore } from '@/stores/auth-store'
 
+import { FlowKeyStats } from './flow-key-stats'
 import { FlowNodeFilterControl } from './flow-node-filter'
 
 interface FlowChartsProps {
@@ -330,6 +331,10 @@ export function FlowCharts(props: FlowChartsProps) {
   const flowQueryParams = useMemo(
     () => buildQueryParams(timeRange, props.filters),
     [props.filters, timeRange]
+  )
+  const timeRangeMinutes = Math.max(
+    (timeRange.end_timestamp - timeRange.start_timestamp) / 60,
+    1
   )
 
   const {
@@ -673,6 +678,11 @@ export function FlowCharts(props: FlowChartsProps) {
           )}
         </div>
       </div>
+
+      <FlowKeyStats
+        nodes={flowData.flow.nodes}
+        timeRangeMinutes={timeRangeMinutes}
+      />
 
       <div className='overflow-hidden rounded-lg border'>
         <div className='flex w-full flex-col gap-2 border-b px-3 py-2 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between'>
