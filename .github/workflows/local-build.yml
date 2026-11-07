@@ -1,14 +1,16 @@
 name: Local build
 
-# Builds the patched linux/amd64 binary and publishes it under the upstream
-# version tag it is based on (for example v1.0.0-rc.47), so the reported version
-# matches an official release and the update checker can compare it normally.
-# A failed run notifies the pusher by email.
+# GitHub never syncs a fork on its own, so this workflow does it: every six hours
+# it fast-forwards main from upstream, rebases feat/token-metric, and rebuilds.
+# Builds are tagged with the upstream release version they are based on (for
+# example v1.0.0-rc.48). A failed run notifies the pusher by email.
 
 on:
   push:
     branches:
       - feat/token-metric
+  schedule:
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -19,12 +21,62 @@ permissions:
   contents: write
 
 jobs:
+  sync:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/token-metric
+          fetch-depth: 0
+
+      - name: Fast-forward main and rebase the patch branch
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream https://github.com/QuantumNous/new-api.git
+          git fetch --tags --force upstream
+          git fetch --force origin main
+
+          BEFORE=$(git rev-parse HEAD)
+
+          git checkout -B main upstream/main
+          git push --force-with-lease origin main
+
+          git checkout feat/token-metric
+          # A conflict fails the run and emails the owner; nothing is pushed
+          # after a failed rebase, so the branch stays deployable.
+          git rebase main
+          git push --force-with-lease origin feat/token-metric
+
+          AFTER=$(git rev-parse HEAD)
+          VERSION=$(git describe --tags --match 'v[0-9]*' --abbrev=0)
+          LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+
+          if [ "$BEFORE" != "$AFTER" ] || [ "$VERSION" != "$LATEST" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "head=$AFTER version=$VERSION previous_release=$LATEST"
+
   build:
+    needs: [sync]
+    if: always() && (github.event_name == 'push' || (needs.sync.result == 'success' && needs.sync.outputs.changed == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: feat/token-metric
           # git describe needs the history back to the last upstream tag.
           fetch-depth: 0
 
